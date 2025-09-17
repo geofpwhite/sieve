@@ -70,7 +70,6 @@ func main() {
 	}()
 	for {
 		for update := range updateChan {
-			// mut.RLock()
 			numString := strconv.Itoa(update.num - 1)
 
 			if len(numString) == 1 {
@@ -87,7 +86,6 @@ func main() {
 			ap.StartSyncMode()
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
 			ap.EndSyncMode()
-			// mut.RUnlock()
 		}
 	}
 
