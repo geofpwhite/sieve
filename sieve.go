@@ -22,7 +22,7 @@ type update struct {
 
 func main() {
 	ap := ansipixels.NewAnsiPixels(0)
-	mut := &sync.RWMutex{}
+	mut := &sync.Mutex{}
 
 	ap.Open()
 	ap.HideCursor()
@@ -70,7 +70,7 @@ func main() {
 	}()
 	for {
 		for update := range updateChan {
-			mut.RLock()
+			// mut.RLock()
 			numString := strconv.Itoa(update.num - 1)
 
 			if len(numString) == 1 {
@@ -87,7 +87,7 @@ func main() {
 			ap.StartSyncMode()
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
 			ap.EndSyncMode()
-			mut.RUnlock()
+			// mut.RUnlock()
 		}
 	}
 
