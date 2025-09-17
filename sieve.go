@@ -4,6 +4,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"fortio.org/terminal/ansipixels"
@@ -21,30 +22,42 @@ type update struct {
 
 func main() {
 	ap := ansipixels.NewAnsiPixels(0)
+	mut := &sync.RWMutex{}
 
 	ap.Open()
-
+	ap.HideCursor()
+	defer func() {
+		ap.MouseClickOff()
+		ap.MouseTrackingOff()
+		ap.ShowCursor()
+		ap.Restore()
+	}()
 	numbersByColor := make(map[int]*tcolor.RGBColor)
 	updateChan := make(chan update)
 	go func() {
-		for i := 2; i < 100; i++ {
+		for i := 2; i < 101; i++ {
 
 			if numbersByColor[i] != nil {
 				continue
 			}
-			color := randomColor()
-			for j := i * 2; j < 100; j += i {
-				numbersByColor[j] = &color
-				time.Sleep(50 * time.Millisecond)
-				updateChan <- update{j, color}
-			}
+			time.Sleep(50 * time.Duration(i) * time.Millisecond)
+			go func() {
+				color := randomColor()
+				for j := i * 2; j < 101; j += i {
+					mut.Lock()
+					numbersByColor[j] = &color
+					mut.Unlock()
+					time.Sleep(50 * time.Duration(i) * time.Millisecond)
+					updateChan <- update{j, color}
+				}
+			}()
 		}
 	}()
 	ap.ClearScreen()
 	for i := range 10 {
 		for j := range 10 {
 			num := i*10 + j
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num))
+			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num+1))
 		}
 	}
 	go func() {
@@ -57,7 +70,9 @@ func main() {
 	}()
 	for {
 		for update := range updateChan {
-			numString := strconv.Itoa(update.num)
+			mut.RLock()
+			numString := strconv.Itoa(update.num - 1)
+
 			if len(numString) == 1 {
 				numString = "0" + numString
 			}
@@ -72,6 +87,7 @@ func main() {
 			ap.StartSyncMode()
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
 			ap.EndSyncMode()
+			mut.RUnlock()
 		}
 	}
 
