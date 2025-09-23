@@ -31,9 +31,7 @@ func main() {
 		ap.MouseClickOff()
 		ap.MouseTrackingOff()
 		ap.ShowCursor()
-		ap.ClearScreen()
 		ap.Restore()
-		ap.ClearScreen()
 	}()
 	numbersByColor := make(map[int]*tcolor.RGBColor)
 	updatedAt := make(map[int]uint64)
@@ -46,21 +44,28 @@ func main() {
 			if numbersByColor[i] != nil {
 				continue
 			}
-			time.Sleep(50 * time.Duration(i) * time.Millisecond)
+			time.Sleep(100 * time.Duration(i) * time.Millisecond)
 			go func() {
 				color := randomColor()
 				for j := i * 2; j < 101; j += i {
 					mut.Lock()
 					numbersByColor[j] = &color
 					mut.Unlock()
-					time.Sleep(50 * time.Duration(i) * time.Millisecond)
+					time.Sleep(100 * time.Duration(i) * time.Millisecond)
 					updateChan <- update{j, color}
 				}
 			}()
 		}
+		switch {
+		}
 	}()
 	ap.ClearScreen()
+	// if ap.Color256 {
 	ap.Draw216ColorImage(0, 0, img)
+	// }
+	// if ap.TrueColor {
+	// ap.DrawTrueColorImage(0, 0, img)
+	// }
 	for i := range 10 {
 		for j := range 10 {
 			num := i*10 + j
