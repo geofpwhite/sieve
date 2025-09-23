@@ -1,6 +1,7 @@
 package main
 
 import (
+	"image"
 	"math/rand/v2"
 	"os"
 	"strconv"
@@ -30,10 +31,15 @@ func main() {
 		ap.MouseClickOff()
 		ap.MouseTrackingOff()
 		ap.ShowCursor()
+		ap.ClearScreen()
 		ap.Restore()
+		ap.ClearScreen()
 	}()
 	numbersByColor := make(map[int]*tcolor.RGBColor)
+	updatedAt := make(map[int]uint64)
+	frame := uint64(0)
 	updateChan := make(chan update)
+	img := image.NewRGBA(image.Rect(0, 0, ap.W, ap.H*2))
 	go func() {
 		for i := 2; i < 101; i++ {
 
@@ -54,10 +60,11 @@ func main() {
 		}
 	}()
 	ap.ClearScreen()
+	ap.Draw216ColorImage(0, 0, img)
 	for i := range 10 {
 		for j := range 10 {
 			num := i*10 + j
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num+1))
+			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, ap.Background.Background()+strconv.Itoa(num+1))
 		}
 	}
 	go func() {
@@ -68,10 +75,12 @@ func main() {
 			}
 		}
 	}()
-	for {
+	go func() {
 		for update := range updateChan {
+			mut.Lock()
 			numString := strconv.Itoa(update.num - 1)
 
+			updatedAt[update.num] = frame
 			if len(numString) == 1 {
 				numString = "0" + numString
 			}
@@ -86,7 +95,43 @@ func main() {
 			ap.StartSyncMode()
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
 			ap.EndSyncMode()
+			mut.Unlock()
 		}
+	}()
+
+	for {
+		mut.Lock()
+		for num := range 101 {
+			if updatedAt[num] == 0 {
+				continue
+			}
+			clr := numbersByColor[num]
+			timeSince := frame - updatedAt[num]
+			if timeSince%100 != 0 {
+				continue
+			}
+			alpha := 1 - float64((min(float64(timeSince)/1000, 255) / 255.))
+			newClr := ansipixels.BlendLinear(ap.Background, *clr, alpha)
+			numString := strconv.Itoa(num - 1)
+
+			if len(numString) == 1 {
+				numString = "0" + numString
+			}
+			i, err := strconv.Atoi(numString[0:1])
+			if err != nil {
+				panic("bad update sent")
+			}
+			j, err := strconv.Atoi(numString[1:])
+			if err != nil {
+				panic("bad update sent")
+			}
+			ap.StartSyncMode()
+			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, newClr.Foreground()+ap.Background.Background()+strconv.Itoa(num))
+			ap.EndSyncMode()
+		}
+		frame++
+		mut.Unlock()
+
 	}
 
 }
