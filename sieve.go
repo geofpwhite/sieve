@@ -3,7 +3,6 @@ package main
 import (
 	"image"
 	"math/rand/v2"
-	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -56,35 +55,21 @@ func main() {
 				}
 			}()
 		}
-		switch {
-		}
 	}()
 	ap.ClearScreen()
-	// if ap.Color256 {
 	ap.Draw216ColorImage(0, 0, img)
-	// }
-	// if ap.TrueColor {
-	// ap.DrawTrueColorImage(0, 0, img)
-	// }
+
 	for i := range 10 {
 		for j := range 10 {
 			num := i*10 + j
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, ap.Background.Background()+strconv.Itoa(num+1))
 		}
 	}
-	go func() {
-		for {
-			ap.ReadOrResizeOrSignalOnce()
-			if len(ap.Data) > 0 && ap.Data[0] == 'q' {
-				os.Exit(1)
-			}
-		}
-	}()
+	go ap.ReadOrResizeOrSignal()
 	go func() {
 		for update := range updateChan {
 			mut.Lock()
 			numString := strconv.Itoa(update.num - 1)
-
 			updatedAt[update.num] = frame
 			if len(numString) == 1 {
 				numString = "0" + numString
@@ -106,6 +91,9 @@ func main() {
 	}()
 
 	for {
+		if len(ap.Data) > 0 && ap.Data[0] == 'q' {
+			return
+		}
 		mut.Lock()
 		for num := range 101 {
 			if updatedAt[num] == 0 {
@@ -132,10 +120,11 @@ func main() {
 				panic("bad update sent")
 			}
 			ap.StartSyncMode()
-			ap.WriteFg(newClr.Color())
+			// ap.WriteFg(newClr.Color())
+			// fg := ap.ColorOutput.Foreground(newClr.Color())
 			// ap.WriteBg(ap.Background.Color())
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num))
-			// ap.WriteAtStr(ap.W*j/10, ap.H*i/10, newClr.Color().Foreground()+ap.Background.Background()+strconv.Itoa(num))
+			// ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", fg, strconv.Itoa(num))
+			ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", newClr.Color().Foreground(), strconv.Itoa(num))
 			ap.EndSyncMode()
 		}
 		frame++
