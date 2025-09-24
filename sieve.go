@@ -98,6 +98,7 @@ func main() {
 				panic("bad update sent")
 			}
 			ap.StartSyncMode()
+
 			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
 			ap.EndSyncMode()
 			mut.Unlock()
@@ -115,7 +116,7 @@ func main() {
 			if timeSince%100 != 0 {
 				continue
 			}
-			alpha := 1 - float64((min(float64(timeSince)/1000, 255) / 255.))
+			alpha := 1 - float64((min(float64(timeSince)/5000, 255) / 255.))
 			newClr := ansipixels.BlendLinear(ap.Background, *clr, alpha)
 			numString := strconv.Itoa(num - 1)
 
@@ -131,7 +132,10 @@ func main() {
 				panic("bad update sent")
 			}
 			ap.StartSyncMode()
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, newClr.Foreground()+ap.Background.Background()+strconv.Itoa(num))
+			ap.WriteFg(newClr.Color())
+			// ap.WriteBg(ap.Background.Color())
+			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num))
+			// ap.WriteAtStr(ap.W*j/10, ap.H*i/10, newClr.Color().Foreground()+ap.Background.Background()+strconv.Itoa(num))
 			ap.EndSyncMode()
 		}
 		frame++
