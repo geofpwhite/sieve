@@ -1,7 +1,7 @@
 package main
 
 import (
-	"image"
+	"fmt"
 	"math/rand/v2"
 	"strconv"
 	"sync"
@@ -20,8 +20,91 @@ type update struct {
 	color tcolor.RGBColor
 }
 
+type queueNode struct {
+	multiple, prime int
+}
+
+type minHeap []queueNode
+
+func (m *minHeap) push(qn queueNode) {
+	*m = append(*m, qn)
+	cur := len(*m) - 1
+	for cur > 0 && (*m)[cur].multiple < (*m)[(cur-1)/2].multiple {
+		(*m)[cur], (*m)[(cur-1)/2] = (*m)[(cur-1)/2], (*m)[cur]
+	}
+}
+
+func (m *minHeap) pop() queueNode {
+	q := (*m)[0]
+	(*m)[0] = (*m)[len(*m)-1]
+	*m = (*m)[:len(*m)-1]
+	cur := 0
+	if len(*m) <= 1 {
+		return q
+	}
+	if len(*m) == 2 {
+		if (*m)[0].multiple > (*m)[1].multiple {
+			(*m)[0], (*m)[1] = (*m)[1], (*m)[0]
+		}
+		return q
+	}
+	for (*m)[cur].multiple > (*m)[cur*2+1].multiple || (*m)[cur].multiple > (*m)[cur*2+2].multiple {
+		if (*m)[cur*2+1].multiple > (*m)[cur*2+2].multiple {
+			(*m)[cur], (*m)[cur*2+2] = (*m)[cur*2+2], (*m)[cur]
+			cur = cur*2 + 2
+		} else {
+			(*m)[cur], (*m)[cur*2+1] = (*m)[cur*2+1], (*m)[cur]
+			cur = cur*2 + 1
+		}
+		if cur*2+1 >= len(*m) || cur*2+2 >= len(*m) {
+			break
+		}
+	}
+	if cur*2+1 < len(*m) && (*m)[cur].multiple > (*m)[cur*2+1].multiple {
+		(*m)[cur], (*m)[cur*2+1] = (*m)[cur*2+1], (*m)[cur]
+	}
+
+	return q
+}
+
+func getPrimesAlternating(primesByCurMultiple map[int]int) {
+	composites := make(map[int]bool)
+	heap := minHeap{{4, 2}}
+	biggestPrimeSoFar := 2
+	visited := make(map[int]bool)
+	var cur queueNode
+	for len(heap) > 0 {
+		cur = heap.pop()
+		primesByCurMultiple[cur.prime] = cur.multiple
+		composites[cur.multiple] = true
+		cur.multiple += cur.prime
+		if cur.multiple < 100 {
+			heap.push(cur)
+		}
+		for i := biggestPrimeSoFar + 1; i < cur.multiple; i++ {
+			primesBelowCheckAbove := true
+			for p := range visited {
+				if primesByCurMultiple[p] < i {
+					primesBelowCheckAbove = false
+					break
+				}
+			}
+			if primesBelowCheckAbove && !composites[i] && !visited[i] {
+				heap.push(queueNode{multiple: i * 2, prime: i})
+				visited[i] = true
+				// fmt.Println(i)
+				biggestPrimeSoFar = i
+				break
+			}
+		}
+	}
+	for i := range visited {
+		fmt.Println(i)
+	}
+}
+
 func main() {
-	ap := ansipixels.NewAnsiPixels(0)
+	ap := ansipixels.NewAnsiPixels(100)
 	mut := &sync.Mutex{}
 
 	ap.Open()
@@ -32,17 +115,21 @@ func main() {
 		ap.ShowCursor()
 		ap.Restore()
 	}()
-	numbersByColor := make(map[int]*tcolor.RGBColor)
-	updatedAt := make(map[int]uint64)
+	numbersByColor := [101]*tcolor.RGBColor{}
+	updatedAt := ([101]uint64{})
+	// curMultiple := update{}
+	// primesByCurMultiple := make(map[int]int)
 	frame := uint64(0)
 	updateChan := make(chan update)
-	img := image.NewRGBA(image.Rect(0, 0, ap.W, ap.H*2))
 	go func() {
 		for i := 2; i < 101; i++ {
 
+			mut.Lock()
 			if numbersByColor[i] != nil {
+				mut.Unlock()
 				continue
 			}
+			mut.Unlock()
 			time.Sleep(100 * time.Duration(i) * time.Millisecond)
 			go func() {
 				color := randomColor()
@@ -57,15 +144,13 @@ func main() {
 		}
 	}()
 	ap.ClearScreen()
-	ap.Draw216ColorImage(0, 0, img)
 
 	for i := range 10 {
 		for j := range 10 {
 			num := i*10 + j
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, ap.Background.Background()+strconv.Itoa(num+1))
+			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, strconv.Itoa(num+1))
 		}
 	}
-	go ap.ReadOrResizeOrSignal()
 	go func() {
 		for update := range updateChan {
 			mut.Lock()
@@ -84,13 +169,18 @@ func main() {
 			}
 			ap.StartSyncMode()
 
-			ap.WriteAtStr(ap.W*j/10, ap.H*i/10, update.color.Foreground()+strconv.Itoa(update.num))
+			ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", update.color.Foreground(), strconv.Itoa(update.num))
 			ap.EndSyncMode()
 			mut.Unlock()
 		}
 	}()
-
+	go ap.ReadOrResizeOrSignal()
 	for {
+		// _, err := ap.ReadOrResizeOrSignalOnce()
+		// if err != nil {
+		// 	panic(err)
+		// }
+
 		if len(ap.Data) > 0 && ap.Data[0] == 'q' {
 			return
 		}
@@ -104,8 +194,8 @@ func main() {
 			if timeSince%100 != 0 {
 				continue
 			}
-			alpha := 1 - float64((min(float64(timeSince)/5000, 255) / 255.))
-			newClr := ansipixels.BlendLinear(ap.Background, *clr, alpha)
+			alpha := 1 - float64((min(float64(timeSince)/5000., 255.) / 255.))
+			newClr := ansipixels.BlendLuminance(ap.Background, *clr, alpha)
 			numString := strconv.Itoa(num - 1)
 
 			if len(numString) == 1 {
@@ -121,9 +211,9 @@ func main() {
 			}
 			ap.StartSyncMode()
 			// ap.WriteFg(newClr.Color())
-			// fg := ap.ColorOutput.Foreground(newClr.Color())
+			fg := ap.ColorOutput.Foreground(newClr.Color())
 			// ap.WriteBg(ap.Background.Color())
-			// ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", fg, strconv.Itoa(num))
+			ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", fg, strconv.Itoa(num))
 			ap.WriteAt(ap.W*j/10, ap.H*i/10, "%s%s", newClr.Color().Foreground(), strconv.Itoa(num))
 			ap.EndSyncMode()
 		}
