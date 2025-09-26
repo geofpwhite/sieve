@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -67,40 +68,65 @@ func (m *minHeap) pop() queueNode {
 	return q
 }
 
-func getPrimesAlternating(primesByCurMultiple map[int]int) {
+func simpleSieve(max int) {
+	primes := make([]int, 0, max)
+	composites := make(map[int]bool)
+
+	for i := 2; i < max; i++ {
+		if composites[i] {
+			continue
+		}
+		primes = append(primes, i)
+		for j := i * 2; j < max; j += i {
+			composites[j] = true
+		}
+	}
+	fmt.Println(primes)
+	fmt.Println(len(primes))
+}
+
+func getPrimesAlternating(max int) {
+	primesByCurMultiple := make(map[int]int)
 	composites := make(map[int]bool)
 	heap := minHeap{{4, 2}}
-	biggestPrimeSoFar := 2
 	visited := make(map[int]bool)
 	var cur queueNode
 	for len(heap) > 0 {
 		cur = heap.pop()
+		visited[cur.prime] = true
 		primesByCurMultiple[cur.prime] = cur.multiple
 		composites[cur.multiple] = true
 		cur.multiple += cur.prime
-		if cur.multiple < 100 {
+		if cur.multiple < max {
 			heap.push(cur)
+		} else {
+			primesByCurMultiple[cur.prime] = cur.multiple
 		}
-		for i := biggestPrimeSoFar + 1; i < cur.multiple; i++ {
+		for i := 2; i < max; i++ {
 			primesBelowCheckAbove := true
+			if composites[i] || visited[i] {
+				continue
+			}
 			for p := range visited {
-				if primesByCurMultiple[p] < i {
+				if primesByCurMultiple[p] < i && p < i/2 {
 					primesBelowCheckAbove = false
 					break
 				}
 			}
-			if primesBelowCheckAbove && !composites[i] && !visited[i] {
+			if primesBelowCheckAbove {
 				heap.push(queueNode{multiple: i * 2, prime: i})
 				visited[i] = true
 				// fmt.Println(i)
-				biggestPrimeSoFar = i
 				break
 			}
 		}
 	}
+	primes := make([]int, 0, len(visited))
 	for i := range visited {
-		fmt.Println(i)
+		primes = append(primes, i)
 	}
+	slices.Sort(primes)
+	fmt.Println(primes)
 }
 
 func main() {

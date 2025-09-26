@@ -6,14 +6,29 @@ func Test_getPrimesAlternating(t *testing.T) {
 	tests := []struct {
 		name string // description of this test case
 		// Named input parameters for target function.
-		primesByCurMultiple map[int]int
+		max int
 	}{
 		// TODO: Add test cases.
-		{"", make(map[int]int)},
+		{"", 100},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			getPrimesAlternating(tt.primesByCurMultiple)
+			getPrimesAlternating(tt.max)
+		})
+	}
+}
+
+func Test_simpleSieve(t *testing.T) {
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for target function.
+		max int
+	}{
+		{"", 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			simpleSieve(tt.max)
 		})
 	}
 }
